@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pivotal-cf-experimental/bosh-stats/deployments"
+	"github.com/pivotal-cloudops/bosh-stats/deployments"
 )
 
 func main() {

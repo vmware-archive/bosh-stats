@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
-	"github.com/pivotal-cf-experimental/bosh-stats/deployments"
+	"github.com/pivotal-cloudops/bosh-stats/deployments"
 )
 
 var _ = Describe("counting bosh deployments in a calendar month", func() {
