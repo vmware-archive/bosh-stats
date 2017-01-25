@@ -27,6 +27,11 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 		return server
 	}
 
+	AfterEach(func() {
+		director.Close()
+		uaa.Close()
+	})
+
 	Context("one page", func() {
 		BeforeEach(func() {
 			director = startHttpsServer(validCert, validKey)
@@ -37,15 +42,15 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 			events := `
 		[
 			{
-				"id": "9",
+				"id": "6",
 				"action": "create",
 				"error": "",
 				"object_type": "deployment",
-				"object_name": "depl1",
+				"object_name": "depl1_that_shouldnt_be_counted_with_no_context",
 				"task": "6"
 			},
 			{
-				"id": "8",
+				"id": "5",
 				"action": "create",
 				"error": "",
 				"object_type": "deployment",
@@ -54,15 +59,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				"context": {"new name": "depl2"}
 			},
 			{
-				"id": "7",
-				"action": "create",
-				"error": "",
-				"object_type": "deployment",
-				"object_name": "failed_deployment",
-				"task": "7"
-			},
-			{
-				"id": "6",
+				"id": "4",
 				"action": "create",
 				"error": "didn't go well",
 				"object_type": "deployment",
@@ -71,29 +68,13 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				"context": {"new name": "depl2"}
 			},
 			{
-				"id": "5",
-				"action": "update",
-				"error": "",
-				"object_type": "deployment",
-				"object_name": "depl1",
-				"task": "8"
-			},
-			{
-				"id": "4",
+				"id": "3",
 				"action": "update",
 				"error": "",
 				"object_type": "deployment",
 				"object_name": "depl1",
 				"task": "8",
 				"context": {"new name": "depl2"}
-			},
-			{
-				"id": "3",
-				"action": "delete",
-				"error": "",
-				"object_type": "deployment",
-				"object_name": "depl1",
-				"task": "9"
 			},
 			{
 				"id": "2",
@@ -127,11 +108,6 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					ghttp.RespondWith(statusOK, events),
 				),
 			)
-		})
-
-		AfterEach(func() {
-			director.Close()
-			uaa.Close()
 		})
 
 		It("returns the number of successful deploys in the provided month", func() {
@@ -209,11 +185,6 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 			)
 		})
 
-		AfterEach(func() {
-			director.Close()
-			uaa.Close()
-		})
-
 		It("returns the number of successful deploys in the provided month", func() {
 			deployCounter := &deployments.DeployCounter{
 				DirectorURL:     director.URL(),
@@ -252,11 +223,6 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					ghttp.RespondWith(statusError, "sorry bro"),
 				),
 			)
-		})
-
-		AfterEach(func() {
-			director.Close()
-			uaa.Close()
 		})
 
 		It("returns a 0 count and an error", func() {
