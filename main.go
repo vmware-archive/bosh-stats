@@ -25,7 +25,7 @@ func main() {
 		CaCert:          *caCert,
 	}
 
-	numberOfDeploys, err := deployCounter.SuccessfulDeploys(*calendarMonth)
+	numberOfDeploys, err := deployCounter.SuccessfulDeploys(*calendarMonth, 200)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

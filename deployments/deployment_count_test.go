@@ -27,15 +27,17 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 		return server
 	}
 
-	BeforeEach(func() {
-		director = startHttpsServer(validCert, validKey)
-		uaa = startHttpsServer(validCert, validKey)
+	Context("one page", func() {
+		BeforeEach(func() {
+			director = startHttpsServer(validCert, validKey)
+			uaa = startHttpsServer(validCert, validKey)
 
-		statusOK := http.StatusOK
-		token := map[string]string{"token": "itsatoken"}
-		events := `
+			statusOK := http.StatusOK
+			token := map[string]string{"token": "itsatoken"}
+			events := `
 		[
 			{
+				"id": "9",
 				"action": "create",
 				"error": "",
 				"object_type": "deployment",
@@ -43,6 +45,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				"task": "6"
 			},
 			{
+				"id": "8",
 				"action": "create",
 				"error": "",
 				"object_type": "deployment",
@@ -51,6 +54,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				"context": {"new name": "depl2"}
 			},
 			{
+				"id": "7",
 				"action": "create",
 				"error": "",
 				"object_type": "deployment",
@@ -58,6 +62,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				"task": "7"
 			},
 			{
+				"id": "6",
 				"action": "create",
 				"error": "didn't go well",
 				"object_type": "deployment",
@@ -66,6 +71,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				"context": {"new name": "depl2"}
 			},
 			{
+				"id": "5",
 				"action": "update",
 				"error": "",
 				"object_type": "deployment",
@@ -73,6 +79,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				"task": "8"
 			},
 			{
+				"id": "4",
 				"action": "update",
 				"error": "",
 				"object_type": "deployment",
@@ -81,6 +88,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				"context": {"new name": "depl2"}
 			},
 			{
+				"id": "3",
 				"action": "delete",
 				"error": "",
 				"object_type": "deployment",
@@ -88,6 +96,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				"task": "9"
 			},
 			{
+				"id": "2",
 				"action": "delete",
 				"error": "",
 				"object_type": "deployment",
@@ -96,6 +105,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				"context": {"new name": "depl2"}
 			},
 			{
+				"id": "1",
 				"action": "create",
 				"error": "",
 				"object_type": "spleloymnt",
@@ -105,39 +115,120 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 			}
 		]`
 
-		uaa.AppendHandlers(ghttp.CombineHandlers(
-			ghttp.VerifyRequest("POST", "/oauth/token"),
-			ghttp.VerifyBasicAuth("some-client", "itsasecret"),
-			ghttp.RespondWithJSONEncodedPtr(&statusOK, &token),
-		))
+			uaa.AppendHandlers(ghttp.CombineHandlers(
+				ghttp.VerifyRequest("POST", "/oauth/token"),
+				ghttp.VerifyBasicAuth("some-client", "itsasecret"),
+				ghttp.RespondWithJSONEncodedPtr(&statusOK, &token),
+			))
 
-		director.AppendHandlers(
-			ghttp.CombineHandlers(
-				ghttp.VerifyRequest("GET", "/events", "before_time=1448927999&after_time=1446336000"),
-				ghttp.RespondWith(statusOK, events),
-			),
-		)
+			director.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "before_time=1448927999&after_time=1446336000"),
+					ghttp.RespondWith(statusOK, events),
+				),
+			)
+		})
+
+		AfterEach(func() {
+			director.Close()
+			uaa.Close()
+		})
+
+		It("returns the number of successful deploys in the provided month", func() {
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999)
+			Expect(director.ReceivedRequests()).To(HaveLen(1))
+			Expect(uaa.ReceivedRequests()).To(HaveLen(1))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(successfulDeploys).To(Equal(2))
+		})
 	})
 
-	AfterEach(func() {
-		director.Close()
-		uaa.Close()
+	Context("many pages", func() {
+		BeforeEach(func() {
+			director = startHttpsServer(validCert, validKey)
+			uaa = startHttpsServer(validCert, validKey)
+
+			statusOK := http.StatusOK
+			token := map[string]string{"token": "itsatoken"}
+			eventsPage1 := `
+			[
+				{
+					"id": "3",
+					"action": "create",
+					"error": "",
+					"object_type": "deployment",
+					"object_name": "depl1",
+					"task": "6",
+					"context": {"new name": "depl1"}
+				},
+				{
+					"id": "2",
+					"action": "create",
+					"error": "FAAAAAAAAAAILED",
+					"object_type": "deployment",
+					"object_name": "failed_deployment",
+					"task": "6"
+				}
+			]`
+
+			eventsPage2 := `
+			[
+				{
+					"id": "1",
+					"action": "create",
+					"error": "",
+					"object_type": "deployment",
+					"object_name": "depl1",
+					"task": "7",
+					"context": {"new name": "depl2"}
+				}
+			]`
+
+			uaa.AppendHandlers(ghttp.CombineHandlers(
+				ghttp.VerifyRequest("POST", "/oauth/token"),
+				ghttp.VerifyBasicAuth("some-client", "itsasecret"),
+				ghttp.RespondWithJSONEncodedPtr(&statusOK, &token),
+			))
+
+			director.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "before_time=1448927999&after_time=1446336000"),
+					ghttp.RespondWith(statusOK, eventsPage1),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "after_time=1446336000&before_id=2&before_time=1448927999"),
+					ghttp.RespondWith(statusOK, eventsPage2),
+				),
+			)
+		})
+
+		AfterEach(func() {
+			director.Close()
+			uaa.Close()
+		})
+
+		It("returns the number of successful deploys in the provided month", func() {
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 2)
+			Expect(director.ReceivedRequests()).To(HaveLen(2))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(successfulDeploys).To(Equal(2))
+		})
 	})
 
-	It("returns the number of successful deploys in the provided month", func() {
-		deployCounter := &deployments.DeployCounter{
-			DirectorURL:     director.URL(),
-			UaaURL:          uaa.URL(),
-			UaaClientID:     "some-client",
-			UaaClientSecret: "itsasecret",
-			CaCert:          validCACert,
-		}
-		successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11")
-		Expect(director.ReceivedRequests()).To(HaveLen(1))
-		Expect(uaa.ReceivedRequests()).To(HaveLen(1))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(successfulDeploys).To(Equal(2))
-	})
 })
 
 var validCert = `-----BEGIN CERTIFICATE-----

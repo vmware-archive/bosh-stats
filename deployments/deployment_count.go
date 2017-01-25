@@ -20,7 +20,7 @@ type DeployCounter struct {
 	CaCert          string
 }
 
-func (d *DeployCounter) SuccessfulDeploys(calendarMonth string) (int, error) {
+func (d *DeployCounter) SuccessfulDeploys(calendarMonth string, itemsPerPage int) (int, error) {
 	logger := boshlog.NewLogger(boshlog.LevelError)
 
 	directorClient, err := createDirectorClient(d, logger)
@@ -33,20 +33,32 @@ func (d *DeployCounter) SuccessfulDeploys(calendarMonth string) (int, error) {
 		return 0, err
 	}
 
-	events, err := directorClient.Events(opts)
-	if err != nil {
-		return 0, err
+	successfulDeploys, _ := reduceDeploymentsToCount(directorClient, []boshdir.Event{}, opts, itemsPerPage, 0)
+
+	return successfulDeploys, nil
+}
+
+func reduceDeploymentsToCount(directorClient boshdir.Director, events []boshdir.Event, opts boshdir.EventsFilter, itemsPerPage int, runningCount int) (int, error) {
+	if len(events) > 0 && len(events) < itemsPerPage {
+		return runningCount, nil
 	}
 
-	successfulDeploys := 0
+	newOpts := opts
+	if len(events) != 0 {
+		newOpts.BeforeID = events[len(events)-1].ID()
+	}
+	newEvents, _ := directorClient.Events(newOpts)
+	return reduceDeploymentsToCount(directorClient, newEvents, newOpts, itemsPerPage, runningCount+deploymentEventCount(newEvents))
+}
 
+func deploymentEventCount(events []boshdir.Event) int {
+	successfulDeploys := 0
 	for _, event := range events {
 		if isDeployment(event) {
 			successfulDeploys++
 		}
 	}
-
-	return successfulDeploys, nil
+	return successfulDeploys
 }
 
 func createDirectorClient(d *DeployCounter, logger boshlog.Logger) (boshdir.Director, error) {
