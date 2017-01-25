@@ -33,7 +33,10 @@ func (d *DeployCounter) SuccessfulDeploys(calendarMonth string, itemsPerPage int
 		return 0, err
 	}
 
-	successfulDeploys, _ := reduceDeploymentsToCount(directorClient, []boshdir.Event{}, opts, itemsPerPage, 0)
+	successfulDeploys, err := reduceDeploymentsToCount(directorClient, []boshdir.Event{}, opts, itemsPerPage, 0)
+	if err != nil {
+		return successfulDeploys, err
+	}
 
 	return successfulDeploys, nil
 }
@@ -47,7 +50,11 @@ func reduceDeploymentsToCount(directorClient boshdir.Director, events []boshdir.
 	if len(events) != 0 {
 		newOpts.BeforeID = events[len(events)-1].ID()
 	}
-	newEvents, _ := directorClient.Events(newOpts)
+	newEvents, err := directorClient.Events(newOpts)
+	if err != nil {
+		return 0, err
+	}
+
 	return reduceDeploymentsToCount(directorClient, newEvents, newOpts, itemsPerPage, runningCount+deploymentEventCount(newEvents))
 }
 
