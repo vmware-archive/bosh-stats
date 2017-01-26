@@ -27,6 +27,11 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 		return server
 	}
 
+	BeforeEach(func() {
+		director = startHttpsServer(validCert, validKey)
+		uaa = startHttpsServer(validCert, validKey)
+	})
+
 	AfterEach(func() {
 		director.Close()
 		uaa.Close()
@@ -34,9 +39,6 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 
 	Context("one page", func() {
 		BeforeEach(func() {
-			director = startHttpsServer(validCert, validKey)
-			uaa = startHttpsServer(validCert, validKey)
-
 			statusOK := http.StatusOK
 			token := map[string]string{"token": "itsatoken"}
 			events := `
@@ -128,11 +130,9 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 
 	Context("many pages", func() {
 		BeforeEach(func() {
-			director = startHttpsServer(validCert, validKey)
-			uaa = startHttpsServer(validCert, validKey)
-
 			statusOK := http.StatusOK
 			token := map[string]string{"token": "itsatoken"}
+
 			eventsPage1 := `
 			[
 				{
@@ -202,9 +202,6 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 
 	Context("error returned from director", func() {
 		BeforeEach(func() {
-			director = startHttpsServer(validCert, validKey)
-			uaa = startHttpsServer(validCert, validKey)
-
 			statusError := http.StatusInternalServerError
 			statusOK := http.StatusOK
 			token := map[string]string{"token": "itsatoken"}
@@ -240,6 +237,50 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 		})
 	})
 
+	Context("using a bad UAA URL", func() {
+		It("returns a 0 count and an error", func() {
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          "uaa",
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999)
+			Expect(director.ReceivedRequests()).To(HaveLen(0))
+			Expect(err).To(HaveOccurred())
+			Expect(successfulDeploys).To(Equal(0))
+		})
+	})
+
+	Context("error returned from UAA", func() {
+		BeforeEach(func() {
+			statusError := http.StatusInternalServerError
+			token := map[string]string{"token": "itsatoken"}
+
+			uaa.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("POST", "/oauth/token"),
+					ghttp.VerifyBasicAuth("some-client", "itsasecret"),
+					ghttp.RespondWithJSONEncodedPtr(&statusError, &token),
+				),
+			)
+		})
+
+		It("returns a 0 count and an error", func() {
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999)
+			Expect(director.ReceivedRequests()).To(HaveLen(0))
+			Expect(err).To(HaveOccurred())
+			Expect(successfulDeploys).To(Equal(0))
+		})
+	})
 })
 
 var validCert = `-----BEGIN CERTIFICATE-----
