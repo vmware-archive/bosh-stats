@@ -241,7 +241,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 		It("returns a 0 count and an error", func() {
 			deployCounter := &deployments.DeployCounter{
 				DirectorURL:     director.URL(),
-				UaaURL:          "uaa",
+				UaaURL:          "%%%",
 				UaaClientID:     "some-client",
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
