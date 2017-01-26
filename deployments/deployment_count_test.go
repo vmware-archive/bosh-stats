@@ -253,6 +253,22 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 		})
 	})
 
+	Context("using a bad director URL", func() {
+		It("returns a 0 count and an error", func() {
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     "",
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999)
+			Expect(director.ReceivedRequests()).To(HaveLen(0))
+			Expect(err).To(HaveOccurred())
+			Expect(successfulDeploys).To(Equal(0))
+		})
+	})
+
 	Context("error returned from UAA", func() {
 		BeforeEach(func() {
 			statusError := http.StatusInternalServerError
