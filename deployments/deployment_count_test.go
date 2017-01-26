@@ -42,61 +42,61 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 			statusOK := http.StatusOK
 			token := map[string]string{"token": "itsatoken"}
 			events := `
-		[
-			{
-				"id": "6",
-				"action": "create",
-				"error": "",
-				"object_type": "deployment",
-				"object_name": "depl1_that_shouldnt_be_counted_with_no_context",
-				"task": "6"
-			},
-			{
-				"id": "5",
-				"action": "create",
-				"error": "",
-				"object_type": "deployment",
-				"object_name": "depl1",
-				"task": "6",
-				"context": {"new name": "depl2"}
-			},
-			{
-				"id": "4",
-				"action": "create",
-				"error": "didn't go well",
-				"object_type": "deployment",
-				"object_name": "failed_deployment",
-				"task": "7",
-				"context": {"new name": "depl2"}
-			},
-			{
-				"id": "3",
-				"action": "update",
-				"error": "",
-				"object_type": "deployment",
-				"object_name": "depl1",
-				"task": "8",
-				"context": {"new name": "depl2"}
-			},
-			{
-				"id": "2",
-				"action": "delete",
-				"error": "",
-				"object_type": "deployment",
-				"object_name": "depl1",
-				"task": "9",
-				"context": {"new name": "depl2"}
-			},
-			{
-				"id": "1",
-				"action": "create",
-				"error": "",
-				"object_type": "spleloymnt",
-				"object_name": "depl1",
-				"task": "9",
-				"context": {"new name": "depl2"}
-			}
-		]`
+			[
+				{
+					"id": "6",
+					"action": "create",
+					"error": "",
+					"object_type": "deployment",
+					"object_name": "depl1_that_shouldnt_be_counted_with_no_context",
+					"task": "6"
+				},
+				{
+					"id": "5",
+					"action": "create",
+					"error": "",
+					"object_type": "deployment",
+					"object_name": "depl1",
+					"task": "6",
+					"context": {"new name": "depl2"}
+				},
+				{
+					"id": "4",
+					"action": "create",
+					"error": "didn't go well",
+					"object_type": "deployment",
+					"object_name": "failed_deployment",
+					"task": "7",
+					"context": {"new name": "depl2"}
+				},
+				{
+					"id": "3",
+					"action": "update",
+					"error": "",
+					"object_type": "deployment",
+					"object_name": "depl1",
+					"task": "8",
+					"context": {"new name": "depl2"}
+				},
+				{
+					"id": "2",
+					"action": "delete",
+					"error": "",
+					"object_type": "deployment",
+					"object_name": "depl1",
+					"task": "9",
+					"context": {"new name": "depl2"}
+				},
+				{
+					"id": "1",
+					"action": "create",
+					"error": "",
+					"object_type": "spleloymnt",
+					"object_name": "depl1",
+					"task": "9",
+					"context": {"new name": "depl2"}
+				}
+			]`
 
 			uaa.AppendHandlers(ghttp.CombineHandlers(
 				ghttp.VerifyRequest("POST", "/oauth/token"),
