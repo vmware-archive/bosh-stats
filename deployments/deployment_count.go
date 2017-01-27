@@ -61,7 +61,7 @@ func reduceDeploymentsToCount(directorClient boshdir.Director, events []boshdir.
 func deploymentEventCount(events []boshdir.Event) int {
 	successfulDeploys := 0
 	for _, event := range events {
-		if isDeployment(event) {
+		if isDeployment(event) && IsNotRepaveUser(event, "repave") {
 			successfulDeploys++
 		}
 	}
@@ -126,6 +126,14 @@ func createCalendarOpts(calendarMonth string) (boshdir.EventsFilter, error) {
 	}
 
 	return opts, nil
+}
+
+func IsNotRepaveUser(event boshdir.Event, repaveUser string) bool {
+	if event.User() == repaveUser {
+		return false
+	}
+
+	return true
 }
 
 func isDeployment(event boshdir.Event) bool {

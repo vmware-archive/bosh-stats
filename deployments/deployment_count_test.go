@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"net/http"
 
+	"github.com/cloudfoundry/bosh-cli/director/directorfakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
@@ -296,6 +297,24 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(successfulDeploys).To(Equal(0))
 		})
+	})
+})
+
+var _ = Describe("#isNotRepaveUser", func() {
+	It("returns true if the event's user is not the repave user", func() {
+		var event = new(directorfakes.FakeEvent)
+		event.UserReturns("not-repave")
+
+		repaveUser := deployments.IsNotRepaveUser(event, "repave")
+		Expect(repaveUser).To(Equal(true))
+	})
+
+	It("returns false if the event's user is the repave user", func() {
+		var event = new(directorfakes.FakeEvent)
+		event.UserReturns("repave")
+
+		repaveUser := deployments.IsNotRepaveUser(event, "repave")
+		Expect(repaveUser).To(Equal(false))
 	})
 })
 
