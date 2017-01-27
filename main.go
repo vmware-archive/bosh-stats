@@ -15,6 +15,7 @@ func main() {
 	uaaClientSecret := os.Getenv("BOSH_STATS_UAA_CLIENT_SECRET")
 	caCert := flag.String("caCert", "", "CA Cert")
 	calendarMonth := flag.String("calendarMonth", "", "Calendar month/year YYYY/MM")
+	repaveUser := flag.String("repaveUser", "", "The username to filter out as the 'repave' user")
 	flag.Parse()
 
 	deployCounter := deployments.DeployCounter{
@@ -25,7 +26,7 @@ func main() {
 		CaCert:          *caCert,
 	}
 
-	numberOfDeploys, err := deployCounter.SuccessfulDeploys(*calendarMonth, 200)
+	numberOfDeploys, err := deployCounter.SuccessfulDeploys(*calendarMonth, 200, *repaveUser)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

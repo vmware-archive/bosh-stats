@@ -121,7 +121,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999)
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave")
 			Expect(director.ReceivedRequests()).To(HaveLen(1))
 			Expect(uaa.ReceivedRequests()).To(HaveLen(1))
 			Expect(err).NotTo(HaveOccurred())
@@ -137,21 +137,33 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 			eventsPage1 := `
 			[
 				{
-					"id": "3",
+					"id": "4",
 					"action": "create",
 					"error": "",
+					"user": "not-repave",
 					"object_type": "deployment",
 					"object_name": "depl1",
 					"task": "6",
 					"context": {"new name": "depl1"}
 				},
 				{
-					"id": "2",
+					"id": "3",
 					"action": "create",
 					"error": "FAAAAAAAAAAILED",
+					"user": "not-repave",
 					"object_type": "deployment",
 					"object_name": "failed_deployment",
 					"task": "6"
+				},
+				{
+					"id": "2",
+					"action": "create",
+					"error": "",
+					"user": "MyCustomRepaveUserInProd",
+					"object_type": "deployment",
+					"object_name": "",
+					"task": "6",
+					"context": {"new name": "depl1"}
 				}
 			]`
 
@@ -194,7 +206,20 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 2)
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 2, "repave")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(successfulDeploys).To(Equal(3))
+		})
+
+		It("filters out deployments made by the repave user given", func() {
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 2, "MyCustomRepaveUserInProd")
 			Expect(director.ReceivedRequests()).To(HaveLen(2))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(successfulDeploys).To(Equal(2))
@@ -231,7 +256,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999)
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave")
 			Expect(director.ReceivedRequests()).To(HaveLen(1))
 			Expect(err).To(HaveOccurred())
 			Expect(successfulDeploys).To(Equal(0))
@@ -247,7 +272,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999)
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave")
 			Expect(director.ReceivedRequests()).To(HaveLen(0))
 			Expect(err).To(HaveOccurred())
 			Expect(successfulDeploys).To(Equal(0))
@@ -263,7 +288,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999)
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave")
 			Expect(director.ReceivedRequests()).To(HaveLen(0))
 			Expect(err).To(HaveOccurred())
 			Expect(successfulDeploys).To(Equal(0))
@@ -292,7 +317,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999)
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave")
 			Expect(director.ReceivedRequests()).To(HaveLen(0))
 			Expect(err).To(HaveOccurred())
 			Expect(successfulDeploys).To(Equal(0))

@@ -20,7 +20,7 @@ type DeployCounter struct {
 	CaCert          string
 }
 
-func (d *DeployCounter) SuccessfulDeploys(calendarMonth string, itemsPerPage int) (int, error) {
+func (d *DeployCounter) SuccessfulDeploys(calendarMonth string, itemsPerPage int, repaveUser string) (int, error) {
 	logger := boshlog.NewLogger(boshlog.LevelError)
 
 	directorClient, err := createDirectorClient(d, logger)
@@ -33,7 +33,7 @@ func (d *DeployCounter) SuccessfulDeploys(calendarMonth string, itemsPerPage int
 		return 0, err
 	}
 
-	successfulDeploys, err := reduceDeploymentsToCount(directorClient, []boshdir.Event{}, opts, itemsPerPage, 0)
+	successfulDeploys, err := reduceDeploymentsToCount(directorClient, []boshdir.Event{}, opts, itemsPerPage, 0, repaveUser)
 	if err != nil {
 		return successfulDeploys, err
 	}
@@ -41,7 +41,7 @@ func (d *DeployCounter) SuccessfulDeploys(calendarMonth string, itemsPerPage int
 	return successfulDeploys, nil
 }
 
-func reduceDeploymentsToCount(directorClient boshdir.Director, events []boshdir.Event, opts boshdir.EventsFilter, itemsPerPage int, runningCount int) (int, error) {
+func reduceDeploymentsToCount(directorClient boshdir.Director, events []boshdir.Event, opts boshdir.EventsFilter, itemsPerPage int, runningCount int, repaveUser string) (int, error) {
 	if len(events) > 0 && len(events) < itemsPerPage {
 		return runningCount, nil
 	}
@@ -55,13 +55,13 @@ func reduceDeploymentsToCount(directorClient boshdir.Director, events []boshdir.
 		return 0, err
 	}
 
-	return reduceDeploymentsToCount(directorClient, newEvents, newOpts, itemsPerPage, runningCount+deploymentEventCount(newEvents))
+	return reduceDeploymentsToCount(directorClient, newEvents, newOpts, itemsPerPage, runningCount+deploymentEventCount(newEvents, repaveUser), repaveUser)
 }
 
-func deploymentEventCount(events []boshdir.Event) int {
+func deploymentEventCount(events []boshdir.Event, repaveUser string) int {
 	successfulDeploys := 0
 	for _, event := range events {
-		if isDeployment(event) && IsNotRepaveUser(event, "repave") {
+		if isDeployment(event) && IsNotRepaveUser(event, repaveUser) {
 			successfulDeploys++
 		}
 	}
