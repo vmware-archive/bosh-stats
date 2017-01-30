@@ -38,6 +38,44 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 		uaa.Close()
 	})
 
+	Context("no page", func() {
+		BeforeEach(func() {
+			statusOK := http.StatusOK
+			token := map[string]string{"token": "itsatoken"}
+			events := `[]`
+
+			uaa.AppendHandlers(ghttp.CombineHandlers(
+				ghttp.VerifyRequest("POST", "/oauth/token"),
+				ghttp.VerifyBasicAuth("some-client", "itsasecret"),
+				ghttp.RespondWithJSONEncodedPtr(&statusOK, &token),
+			))
+
+			director.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "before_time=1448927999&after_time=1446336000"),
+					ghttp.RespondWith(statusOK, events),
+				),
+			)
+		})
+
+		It("returns 0 when no events are found", func() {
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+
+			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave")
+			Expect(director.ReceivedRequests()).To(HaveLen(1))
+			Expect(uaa.ReceivedRequests()).To(HaveLen(1))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(successfulDeploys).To(Equal(0))
+
+		})
+	})
+
 	Context("one page", func() {
 		BeforeEach(func() {
 			statusOK := http.StatusOK

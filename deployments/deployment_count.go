@@ -55,6 +55,10 @@ func reduceDeploymentsToCount(directorClient boshdir.Director, events []boshdir.
 		return 0, err
 	}
 
+	if len(newEvents) == 0 {
+		return runningCount, nil
+	}
+
 	return reduceDeploymentsToCount(directorClient, newEvents, newOpts, itemsPerPage, runningCount+deploymentEventCount(newEvents, repaveUser), repaveUser)
 }
 
