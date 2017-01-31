@@ -67,11 +67,12 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				CaCert:          validCACert,
 			}
 
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave")
+			runningCount := make(map[string]int)
+			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount)
 			Expect(director.ReceivedRequests()).To(HaveLen(1))
 			Expect(uaa.ReceivedRequests()).To(HaveLen(1))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(successfulDeploys).To(Equal(0))
+			Expect(runningCount).To(Equal(map[string]int{}))
 
 		})
 	})
@@ -88,6 +89,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					"error": "",
 					"object_type": "deployment",
 					"object_name": "depl1_that_shouldnt_be_counted_with_no_context",
+					"deployment": "bla1",
 					"task": "6"
 				},
 				{
@@ -96,6 +98,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					"error": "",
 					"object_type": "deployment",
 					"object_name": "depl1",
+					"deployment": "bla1",
 					"task": "6",
 					"context": {"new name": "depl2"}
 				},
@@ -105,6 +108,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					"error": "didn't go well",
 					"object_type": "deployment",
 					"object_name": "failed_deployment",
+					"deployment": "bla1",
 					"task": "7",
 					"context": {"new name": "depl2"}
 				},
@@ -114,6 +118,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					"error": "",
 					"object_type": "deployment",
 					"object_name": "depl1",
+					"deployment": "bla2",
 					"task": "8",
 					"context": {"new name": "depl2"}
 				},
@@ -123,6 +128,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					"error": "",
 					"object_type": "deployment",
 					"object_name": "depl1",
+					"deployment": "bla1",
 					"task": "9",
 					"context": {"new name": "depl2"}
 				},
@@ -132,6 +138,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					"error": "",
 					"object_type": "spleloymnt",
 					"object_name": "depl1",
+					"deployment": "bla1",
 					"task": "9",
 					"context": {"new name": "depl2"}
 				}
@@ -159,11 +166,17 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave")
+
+			runningCount := make(map[string]int)
+			expectedRunningcount := map[string]int{
+				"bla1": 1,
+				"bla2": 1,
+			}
+			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount)
 			Expect(director.ReceivedRequests()).To(HaveLen(1))
 			Expect(uaa.ReceivedRequests()).To(HaveLen(1))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(successfulDeploys).To(Equal(2))
+			Expect(runningCount).To(Equal(expectedRunningcount))
 		})
 	})
 
@@ -181,6 +194,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					"user": "not-repave",
 					"object_type": "deployment",
 					"object_name": "depl1",
+					"deployment": "bla1",
 					"task": "6",
 					"context": {"new name": "depl1"}
 				},
@@ -191,6 +205,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					"user": "not-repave",
 					"object_type": "deployment",
 					"object_name": "failed_deployment",
+					"deployment": "bla1",
 					"task": "6"
 				},
 				{
@@ -200,6 +215,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					"user": "MyCustomRepaveUserInProd",
 					"object_type": "deployment",
 					"object_name": "",
+					"deployment": "bla1",
 					"task": "6",
 					"context": {"new name": "depl1"}
 				}
@@ -211,8 +227,10 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					"id": "1",
 					"action": "create",
 					"error": "",
+					"user": "not-repave",
 					"object_type": "deployment",
 					"object_name": "depl1",
+					"deployment": "bla2",
 					"task": "7",
 					"context": {"new name": "depl2"}
 				}
@@ -244,9 +262,14 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 2, "repave")
+			runningCount := make(map[string]int)
+			expectedRunningcount := map[string]int{
+				"bla1": 2,
+				"bla2": 1,
+			}
+			err := deployCounter.SuccessfulDeploys("2015/11", 3, "repave", &runningCount)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(successfulDeploys).To(Equal(3))
+			Expect(runningCount).To(Equal(expectedRunningcount))
 		})
 
 		It("filters out deployments made by the repave user given", func() {
@@ -257,10 +280,16 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 2, "MyCustomRepaveUserInProd")
+			runningCount := make(map[string]int)
+			expectedRunningcount := map[string]int{
+				"bla1": 1,
+				"bla2": 1,
+			}
+
+			err := deployCounter.SuccessfulDeploys("2015/11", 3, "MyCustomRepaveUserInProd", &runningCount)
 			Expect(director.ReceivedRequests()).To(HaveLen(2))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(successfulDeploys).To(Equal(2))
+			Expect(runningCount).To(Equal(expectedRunningcount))
 		})
 	})
 
@@ -294,10 +323,13 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave")
+			runningCount := make(map[string]int)
+			expectedRunningcount := map[string]int{}
+
+			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount)
 			Expect(director.ReceivedRequests()).To(HaveLen(1))
 			Expect(err).To(HaveOccurred())
-			Expect(successfulDeploys).To(Equal(0))
+			Expect(runningCount).To(Equal(expectedRunningcount))
 		})
 	})
 
@@ -310,10 +342,13 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave")
+			runningCount := make(map[string]int)
+			expectedRunningcount := map[string]int{}
+
+			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount)
 			Expect(director.ReceivedRequests()).To(HaveLen(0))
 			Expect(err).To(HaveOccurred())
-			Expect(successfulDeploys).To(Equal(0))
+			Expect(runningCount).To(Equal(expectedRunningcount))
 		})
 	})
 
@@ -326,10 +361,14 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave")
+
+			runningCount := make(map[string]int)
+			expectedRunningcount := map[string]int{}
+
+			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount)
 			Expect(director.ReceivedRequests()).To(HaveLen(0))
 			Expect(err).To(HaveOccurred())
-			Expect(successfulDeploys).To(Equal(0))
+			Expect(runningCount).To(Equal(expectedRunningcount))
 		})
 	})
 
@@ -355,10 +394,14 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				UaaClientSecret: "itsasecret",
 				CaCert:          validCACert,
 			}
-			successfulDeploys, err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave")
+
+			runningCount := make(map[string]int)
+			expectedRunningcount := map[string]int{}
+
+			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount)
 			Expect(director.ReceivedRequests()).To(HaveLen(0))
 			Expect(err).To(HaveOccurred())
-			Expect(successfulDeploys).To(Equal(0))
+			Expect(runningCount).To(Equal(expectedRunningcount))
 		})
 	})
 })
