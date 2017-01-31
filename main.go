@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -26,6 +27,16 @@ func friendlyCalendarMonth(calendarMonth *string) string {
 	return friendlyCalendarMonth
 }
 
+func printJSON(numberByDeployment map[string]int) {
+	jsonOutput, err := json.Marshal(numberByDeployment)
+	fmt.Println(string(jsonOutput[:]))
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
 func printResults(numberByDeployment map[string]int, calendarMonth *string) {
 	totalDeploys := 0
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight|tabwriter.Debug)
@@ -44,6 +55,7 @@ func printResults(numberByDeployment map[string]int, calendarMonth *string) {
 }
 
 func main() {
+	var outputJson bool
 	directorURL := flag.String("directorUrl", "", "bosh director URL")
 	uaaURL := flag.String("uaaUrl", "", "UAA URL")
 	uaaClientID := flag.String("uaaClientId", "", "UAA Client ID")
@@ -51,6 +63,7 @@ func main() {
 	caCert := flag.String("caCert", "", "CA Cert")
 	calendarMonth := flag.String("calendarMonth", "", "Calendar month/year YYYY/MM")
 	repaveUser := flag.String("repaveUser", "", "The username to filter out as the 'repave' user")
+	flag.BoolVar(&outputJson, "json", false, "print JSON to standard out instead of a table")
 	flag.Parse()
 
 	deployCounter := deployments.DeployCounter{
@@ -62,11 +75,17 @@ func main() {
 	}
 
 	numberByDeployment := make(map[string]int)
+
 	err := deployCounter.SuccessfulDeploys(*calendarMonth, 200, *repaveUser, &numberByDeployment)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	printResults(numberByDeployment, calendarMonth)
+	if outputJson {
+		printJSON(numberByDeployment)
+	} else {
+		printResults(numberByDeployment, calendarMonth)
+	}
+
 }
