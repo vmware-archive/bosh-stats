@@ -11,19 +11,21 @@ All arguments are required
 ```
 Usage of bosh-stats:
   -caCert string
-    	CA Cert
+      CA Cert
   -calendarMonth string
-    	Calendar month/year YYYY/MM
+      Calendar month/year YYYY/MM
   -directorUrl string
-    	bosh director URL
+      bosh director URL
+  -json
+      print JSON to standard out (output is a table by default)
   -repaveUser string
-    	The username to filter out as the 'repave' user
+      The username to filter out as the 'repave' user
   -uaaClientId string
-    	UAA Client ID
+      UAA Client ID
   -uaaClientSecret string
-    	UAA Client Secret
+      UAA Client Secret
   -uaaUrl string
-    	UAA URL
+      UAA URL
 ```
 
 

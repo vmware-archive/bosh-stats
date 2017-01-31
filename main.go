@@ -63,7 +63,7 @@ func main() {
 	caCert := flag.String("caCert", "", "CA Cert")
 	calendarMonth := flag.String("calendarMonth", "", "Calendar month/year YYYY/MM")
 	repaveUser := flag.String("repaveUser", "", "The username to filter out as the 'repave' user")
-	flag.BoolVar(&outputJson, "json", false, "print JSON to standard out instead of a table")
+	flag.BoolVar(&outputJson, "json", false, "print JSON to standard out (output is a table by default)")
 	flag.Parse()
 
 	deployCounter := deployments.DeployCounter{
