@@ -3,6 +3,7 @@ package deployments_test
 import (
 	"crypto/tls"
 	"net/http"
+	"time"
 
 	"github.com/cloudfoundry/bosh-cli/director/directorfakes"
 	. "github.com/onsi/ginkgo"
@@ -11,7 +12,7 @@ import (
 	"github.com/pivotal-cloudops/bosh-stats/deployments"
 )
 
-var _ = Describe("counting bosh deployments in a calendar month", func() {
+var _ = Describe("counting bosh deployments and get deploy date", func() {
 	var (
 		uaa      *ghttp.Server
 		director *ghttp.Server
@@ -39,10 +40,11 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 	})
 
 	Context("no page", func() {
+		statusOK := http.StatusOK
+		events := `[]`
+
 		BeforeEach(func() {
-			statusOK := http.StatusOK
 			token := map[string]string{"token": "itsatoken"}
-			events := `[]`
 
 			uaa.AppendHandlers(ghttp.CombineHandlers(
 				ghttp.VerifyRequest("POST", "/oauth/token"),
@@ -50,15 +52,16 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				ghttp.RespondWithJSONEncodedPtr(&statusOK, &token),
 			))
 
+		})
+
+		It("returns 0 when no events are found", func() {
 			director.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/events", "before_time=1448927999&after_time=1446336000"),
 					ghttp.RespondWith(statusOK, events),
 				),
 			)
-		})
 
-		It("returns 0 when no events are found", func() {
 			deployCounter := &deployments.DeployCounter{
 				DirectorURL:     director.URL(),
 				UaaURL:          uaa.URL(),
@@ -74,6 +77,29 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(runningCount).To(Equal(map[string]int{}))
 
+		})
+
+		It("raise error when no events releated to the release deploy", func() {
+			director.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events"),
+					ghttp.RespondWith(statusOK, events),
+				),
+			)
+
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+
+			date, err := deployCounter.DeployDate("cf", "123", 999)
+			Expect(director.ReceivedRequests()).To(HaveLen(1))
+			Expect(uaa.ReceivedRequests()).To(HaveLen(1))
+			Expect(err).To(HaveOccurred())
+			Expect(date).To(Equal(time.Time{}))
 		})
 	})
 
@@ -114,7 +140,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				},
 				{
 					"id": "3",
-					"action": "update",
+					"action": "delete",
 					"error": "",
 					"object_type": "deployment",
 					"object_name": "depl1",
@@ -124,13 +150,23 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				},
 				{
 					"id": "2",
-					"action": "delete",
+					"action": "update",
+					"timestamp": 1448000000,
 					"error": "",
 					"object_type": "deployment",
 					"object_name": "depl1",
-					"deployment": "bla1",
+					"deployment": "bla2",
 					"task": "9",
-					"context": {"new name": "depl2"}
+					"context": {
+						"before": {
+							"releases": ["cf/122"],
+							"stemcells": ["bosh-aws-xen-hvm-ubuntu-trusty-go_agent/3312.12"]
+						},
+						"after": {
+							"releases": ["cf/123"],
+							"stemcells": ["bosh-aws-xen-hvm-ubuntu-trusty-go_agent/3312.12"]
+						}
+					}
 				},
 				{
 					"id": "1",
@@ -152,7 +188,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 
 			director.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/events", "before_time=1448927999&after_time=1446336000"),
+					ghttp.VerifyRequest("GET", "/events"),
 					ghttp.RespondWith(statusOK, events),
 				),
 			)
@@ -178,70 +214,106 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(runningCount).To(Equal(expectedRunningcount))
 		})
+
+		It("returns the date of deploy happens to update the release", func() {
+			statusOK := http.StatusOK
+			events := `[]`
+
+			director.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "before_id=1"),
+					ghttp.RespondWith(statusOK, events),
+				),
+			)
+
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+
+			date, err := deployCounter.DeployDate("cf", "123", 999)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(date).To(Equal(time.Unix(1448000000, 0).UTC()))
+		})
 	})
 
 	Context("many pages", func() {
+		statusOK := http.StatusOK
+		eventsPage1 := `
+		[
+		{
+			"id": "4",
+			"action": "create",
+			"error": "",
+			"user": "not-repave",
+			"object_type": "deployment",
+			"object_name": "depl1",
+			"deployment": "bla1",
+			"task": "6",
+			"context": {"new name": "depl1"}
+		},
+		{
+			"id": "3",
+			"action": "create",
+			"error": "FAAAAAAAAAAILED",
+			"user": "not-repave",
+			"object_type": "deployment",
+			"object_name": "failed_deployment",
+			"deployment": "bla1",
+			"task": "6"
+		},
+		{
+			"id": "2",
+			"action": "create",
+			"error": "",
+			"user": "MyCustomRepaveUserInProd",
+			"object_type": "deployment",
+			"object_name": "",
+			"deployment": "bla1",
+			"task": "6",
+			"context": {"new name": "depl1"}
+		}
+		]`
+
+		eventsPage2 := `
+		[
+		{
+			"id": "1",
+			"action": "update",
+			"timestamp": 1448000000,
+			"error": "",
+			"user": "not-repave",
+			"object_type": "deployment",
+			"object_name": "depl1",
+			"deployment": "bla2",
+			"task": "7",
+			"context": {
+				"before": {
+					"releases": ["cf/122"],
+					"stemcells": ["bosh-aws-xen-hvm-ubuntu-trusty-go_agent/3312.12"]
+				},
+				"after": {
+					"releases": ["cf/123"],
+					"stemcells": ["bosh-aws-xen-hvm-ubuntu-trusty-go_agent/3312.12"]
+				}
+			}
+		}
+		]`
+
 		BeforeEach(func() {
-			statusOK := http.StatusOK
 			token := map[string]string{"token": "itsatoken"}
-
-			eventsPage1 := `
-			[
-				{
-					"id": "4",
-					"action": "create",
-					"error": "",
-					"user": "not-repave",
-					"object_type": "deployment",
-					"object_name": "depl1",
-					"deployment": "bla1",
-					"task": "6",
-					"context": {"new name": "depl1"}
-				},
-				{
-					"id": "3",
-					"action": "create",
-					"error": "FAAAAAAAAAAILED",
-					"user": "not-repave",
-					"object_type": "deployment",
-					"object_name": "failed_deployment",
-					"deployment": "bla1",
-					"task": "6"
-				},
-				{
-					"id": "2",
-					"action": "create",
-					"error": "",
-					"user": "MyCustomRepaveUserInProd",
-					"object_type": "deployment",
-					"object_name": "",
-					"deployment": "bla1",
-					"task": "6",
-					"context": {"new name": "depl1"}
-				}
-			]`
-
-			eventsPage2 := `
-			[
-				{
-					"id": "1",
-					"action": "create",
-					"error": "",
-					"user": "not-repave",
-					"object_type": "deployment",
-					"object_name": "depl1",
-					"deployment": "bla2",
-					"task": "7",
-					"context": {"new name": "depl2"}
-				}
-			]`
 
 			uaa.AppendHandlers(ghttp.CombineHandlers(
 				ghttp.VerifyRequest("POST", "/oauth/token"),
 				ghttp.VerifyBasicAuth("some-client", "itsasecret"),
 				ghttp.RespondWithJSONEncodedPtr(&statusOK, &token),
 			))
+		})
 
+		It("returns the number of successful deploys in the provided month", func() {
 			director.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/events", "before_time=1448927999&after_time=1446336000"),
@@ -252,9 +324,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 					ghttp.RespondWith(statusOK, eventsPage2),
 				),
 			)
-		})
 
-		It("returns the number of successful deploys in the provided month", func() {
 			deployCounter := &deployments.DeployCounter{
 				DirectorURL:     director.URL(),
 				UaaURL:          uaa.URL(),
@@ -273,6 +343,17 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 		})
 
 		It("filters out deployments made by the repave user given", func() {
+			director.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "before_time=1448927999&after_time=1446336000"),
+					ghttp.RespondWith(statusOK, eventsPage1),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "after_time=1446336000&before_id=2&before_time=1448927999"),
+					ghttp.RespondWith(statusOK, eventsPage2),
+				),
+			)
+
 			deployCounter := &deployments.DeployCounter{
 				DirectorURL:     director.URL(),
 				UaaURL:          uaa.URL(),
@@ -290,6 +371,31 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 			Expect(director.ReceivedRequests()).To(HaveLen(2))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(runningCount).To(Equal(expectedRunningcount))
+		})
+
+		It("find the deploy date of cf/123", func() {
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+
+			director.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events"),
+					ghttp.RespondWith(statusOK, eventsPage1),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "before_id=2"),
+					ghttp.RespondWith(statusOK, eventsPage2),
+				),
+			)
+
+			date, err := deployCounter.DeployDate("cf", "123", 3)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(date).To(Equal(time.Unix(1448000000, 0).UTC()))
 		})
 	})
 

@@ -63,6 +63,10 @@ func main() {
 	caCert := flag.String("caCert", "", "CA Cert")
 	calendarMonth := flag.String("calendarMonth", "", "Calendar month/year YYYY/MM")
 	repaveUser := flag.String("repaveUser", "", "The username to filter out as the 'repave' user")
+
+	releaseName := flag.String("release", "", "The release to filter for the deploy date")
+	releaseVersion := flag.String("version", "", "The version to filter for the deploy date")
+
 	flag.BoolVar(&outputJson, "json", false, "print JSON to standard out (output is a table by default)")
 	flag.Parse()
 
@@ -74,18 +78,27 @@ func main() {
 		CaCert:          *caCert,
 	}
 
-	numberByDeployment := make(map[string]int)
+	if *releaseName == "" {
+		numberByDeployment := make(map[string]int)
 
-	err := deployCounter.SuccessfulDeploys(*calendarMonth, 200, *repaveUser, &numberByDeployment)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+		err := deployCounter.SuccessfulDeploys(*calendarMonth, 200, *repaveUser, &numberByDeployment)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 
-	if outputJson {
-		printJSON(numberByDeployment)
+		if outputJson {
+			printJSON(numberByDeployment)
+		} else {
+			printResults(numberByDeployment, calendarMonth)
+		}
+
 	} else {
-		printResults(numberByDeployment, calendarMonth)
+		date, err := deployCounter.DeployDate(*releaseName, *releaseVersion, 200)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println(date)
 	}
-
 }

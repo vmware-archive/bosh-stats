@@ -1,6 +1,7 @@
 package deployments
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -39,6 +40,54 @@ func (d *DeployCounter) SuccessfulDeploys(calendarMonth string, itemsPerPage int
 	}
 
 	return nil
+}
+
+func (d *DeployCounter) DeployDate(release string, version string, itemsPerPage int) (time.Time, error) {
+	logger := boshlog.NewLogger(boshlog.LevelError)
+
+	directorClient, err := createDirectorClient(d, logger)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	opts := boshdir.EventsFilter{}
+
+	deployDate, err := reduceDeployDate(directorClient, []boshdir.Event{}, opts, itemsPerPage, release, version)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return deployDate, err
+}
+
+func reduceDeployDate(directorClient boshdir.Director, events []boshdir.Event, opts boshdir.EventsFilter, itemsPerPage int, release string, version string) (time.Time, error) {
+	newOpts := opts
+	if len(events) != 0 {
+		newOpts.BeforeID = events[len(events)-1].ID()
+	}
+	newEvents, err := directorClient.Events(newOpts)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	if len(newEvents) == 0 {
+		return time.Time{}, errors.New("Deploy Not found")
+	}
+
+	date, found_ok := findDeployTime(newEvents, release, version)
+	if found_ok {
+		return date, nil
+	} else {
+		return reduceDeployDate(directorClient, newEvents, newOpts, itemsPerPage, release, version)
+	}
+}
+
+func findDeployTime(events []boshdir.Event, release string, version string) (time.Time, bool) {
+	for _, event := range events {
+		if isDeployment(event) && IsReleaseUpdate(event, release, version) {
+			return event.Timestamp(), true
+		}
+	}
+	return time.Time{}, false
 }
 
 func reduceDeploymentsToCount(directorClient boshdir.Director, events []boshdir.Event, opts boshdir.EventsFilter, itemsPerPage int, runningCount *map[string]int, repaveUser string) error {
@@ -138,6 +187,58 @@ func IsNotRepaveUser(event boshdir.Event, repaveUser string) bool {
 	}
 
 	return true
+}
+
+func IsReleaseUpdate(event boshdir.Event, release string, version string) bool {
+	context := event.Context()
+	context_before, ok := context["before"].(map[string]interface{})
+
+	if ok != true {
+		return false
+	}
+	context_after, ok := context["after"].(map[string]interface{})
+
+	if ok != true {
+		return false
+	}
+
+	releases_before, ok := context_before["releases"].([]interface{})
+	if ok != true {
+		return false
+	}
+
+	releases_after, ok := context_after["releases"].([]interface{})
+	if ok != true {
+		return false
+	}
+
+	version_int, err := strconv.Atoi(version)
+	if err != nil {
+		panic(err)
+	}
+
+	version_before := strconv.Itoa(version_int - 1)
+
+	old_release := fmt.Sprintf("%s/%s", release, version_before)
+	new_release := fmt.Sprintf("%s/%s", release, version)
+
+	found_old_release, found_new_release := false, false
+
+	for _, release := range releases_before {
+		if release == old_release {
+			found_old_release = true
+			break
+		}
+	}
+
+	for _, release := range releases_after {
+		if release == new_release {
+			found_new_release = true
+			break
+		}
+	}
+
+	return found_old_release && found_new_release
 }
 
 func isDeployment(event boshdir.Event) bool {
