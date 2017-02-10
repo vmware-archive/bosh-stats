@@ -3,6 +3,7 @@ package deployments_test
 import (
 	"crypto/tls"
 	"net/http"
+	"time"
 
 	"github.com/cloudfoundry/bosh-cli/director/directorfakes"
 	. "github.com/onsi/ginkgo"
@@ -11,7 +12,7 @@ import (
 	"github.com/pivotal-cloudops/bosh-stats/deployments"
 )
 
-var _ = Describe("counting bosh deployments in a calendar month", func() {
+var _ = Describe("counting bosh deployments and get deploy date", func() {
 	var (
 		uaa      *ghttp.Server
 		director *ghttp.Server
@@ -42,7 +43,6 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 		BeforeEach(func() {
 			statusOK := http.StatusOK
 			token := map[string]string{"token": "itsatoken"}
-			events := `[]`
 
 			uaa.AppendHandlers(ghttp.CombineHandlers(
 				ghttp.VerifyRequest("POST", "/oauth/token"),
@@ -50,15 +50,20 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				ghttp.RespondWithJSONEncodedPtr(&statusOK, &token),
 			))
 
+		})
+
+		It("returns 0 when no events are found", func() {
+
+			statusOK := http.StatusOK
+			events := `[]`
+
 			director.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/events", "before_time=1448927999&after_time=1446336000"),
 					ghttp.RespondWith(statusOK, events),
 				),
 			)
-		})
 
-		It("returns 0 when no events are found", func() {
 			deployCounter := &deployments.DeployCounter{
 				DirectorURL:     director.URL(),
 				UaaURL:          uaa.URL(),
@@ -74,6 +79,32 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(runningCount).To(Equal(map[string]int{}))
 
+		})
+
+		It("raise error when no events releated to the release deploy", func() {
+			statusOK := http.StatusOK
+			events := `[]`
+
+			director.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events"),
+					ghttp.RespondWith(statusOK, events),
+				),
+			)
+
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+
+			date, err := deployCounter.DeployDate("cf", "123", 999)
+			Expect(director.ReceivedRequests()).To(HaveLen(1))
+			Expect(uaa.ReceivedRequests()).To(HaveLen(1))
+			Expect(err).To(HaveOccurred())
+			Expect(date).To(Equal(time.Time{}))
 		})
 	})
 
@@ -114,7 +145,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				},
 				{
 					"id": "3",
-					"action": "update",
+					"action": "delete",
 					"error": "",
 					"object_type": "deployment",
 					"object_name": "depl1",
@@ -124,13 +155,23 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 				},
 				{
 					"id": "2",
-					"action": "delete",
+					"action": "update",
+					"timestamp": 1448000000,
 					"error": "",
 					"object_type": "deployment",
 					"object_name": "depl1",
-					"deployment": "bla1",
+					"deployment": "bla2",
 					"task": "9",
-					"context": {"new name": "depl2"}
+					"context": {
+						"before": {
+							"releases": ["cf/122"],
+							"stemcells": ["bosh-aws-xen-hvm-ubuntu-trusty-go_agent/3312.12"]
+						},
+						"after": {
+							"releases": ["cf/123"],
+							"stemcells": ["bosh-aws-xen-hvm-ubuntu-trusty-go_agent/3312.12"]
+						}
+					}
 				},
 				{
 					"id": "1",
@@ -152,7 +193,7 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 
 			director.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/events", "before_time=1448927999&after_time=1446336000"),
+					ghttp.VerifyRequest("GET", "/events"),
 					ghttp.RespondWith(statusOK, events),
 				),
 			)
@@ -177,6 +218,30 @@ var _ = Describe("counting bosh deployments in a calendar month", func() {
 			Expect(uaa.ReceivedRequests()).To(HaveLen(1))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(runningCount).To(Equal(expectedRunningcount))
+		})
+
+		It("returns the date of deploy happens to update the release", func() {
+			statusOK := http.StatusOK
+			events := `[]`
+
+			director.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "before_id=1"),
+					ghttp.RespondWith(statusOK, events),
+				),
+			)
+
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+
+			date, err := deployCounter.DeployDate("cf", "123", 999)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(date).To(Equal(time.Unix(1448000000, 0)))
 		})
 	})
 
