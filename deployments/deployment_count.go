@@ -70,7 +70,7 @@ func reduceDeployDate(directorClient boshdir.Director, events []boshdir.Event, o
 	}
 
 	if len(newEvents) == 0 {
-		return time.Time{}, errors.New("Deploy Not found")
+		return time.Time{}, errors.New(fmt.Sprintf("No events found for %s version %s", release, version))
 	}
 
 	date, found_ok := findDeployTime(newEvents, release, version)
