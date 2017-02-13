@@ -5,7 +5,7 @@ A tool to collect statistics from bosh director
 1. This binary assumes that you have direct connectivity to BOSH and it's UAA. To test it, you can run `nc -v <bosh-director-ip> 25555` and `nc -v <uaa-ip> <uaa-port> (default: 8443)`
 
 ## To run this tool
-1. Download the appropriate [binary](https://github.com/pivotal-cloudops/bosh-stats/releases/tag/1.0.0) for your environment.
+1. Download the appropriate [binary](https://github.com/pivotal-cloudops/bosh-stats/releases) for your environment.
 
 All arguments are required
 ```
