@@ -238,6 +238,31 @@ var _ = Describe("counting bosh deployments and get deploy date", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(date).To(Equal(time.Unix(1448000000, 0).UTC()))
 		})
+
+		It("raises an error when there is no release update coresponded to the version", func() {
+			statusOK := http.StatusOK
+			events := `[]`
+
+			director.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "before_id=1"),
+					ghttp.RespondWith(statusOK, events),
+				),
+			)
+
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+
+			_, err := deployCounter.DeployDate("diego", "1.6.2", 999)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError("No events found for diego version 1.6.2"))
+		})
+
 	})
 
 	Context("many pages", func() {
@@ -296,12 +321,64 @@ var _ = Describe("counting bosh deployments and get deploy date", func() {
 					"stemcells": ["bosh-aws-xen-hvm-ubuntu-trusty-go_agent/3312.12"]
 				},
 				"after": {
-					"releases": ["cf/123"],
+					"releases": ["cf/122", "cf/123"],
 					"stemcells": ["bosh-aws-xen-hvm-ubuntu-trusty-go_agent/3312.12"]
 				}
 			}
 		}
 		]`
+
+		eventsPage2_diego := `
+		[
+		{
+			"id": "1",
+			"action": "update",
+			"timestamp": 1448000000,
+			"error": "",
+			"user": "not-repave",
+			"object_type": "deployment",
+			"object_name": "depl1",
+			"deployment": "bla2",
+			"task": "7",
+			"context": {
+				"before": {
+					"releases": ["cf/123","diego/1.6.0"],
+					"stemcells": ["bosh-aws-xen-hvm-ubuntu-trusty-go_agent/3312.12"]
+				},
+				"after": {
+					"releases": ["cf/123", "diego/1.6.2"],
+					"stemcells": ["bosh-aws-xen-hvm-ubuntu-trusty-go_agent/3312.12"]
+				}
+			}
+		}
+		]`
+
+		eventsPage2_foo := `
+		[
+		{
+			"id": "1",
+			"action": "update",
+			"timestamp": 1448000000,
+			"error": "",
+			"user": "not-repave",
+			"object_type": "deployment",
+			"object_name": "depl1",
+			"deployment": "bla2",
+			"task": "7",
+			"context": {
+				"before": {
+					"releases": ["foo/123","foo/124"],
+					"stemcells": ["bosh-aws-xen-hvm-ubuntu-trusty-go_agent/3312.12"]
+				},
+				"after": {
+					"releases": ["foo/123", "foo/124"],
+					"stemcells": ["bosh-aws-xen-hvm-ubuntu-trusty-go_agent/3312.12"]
+				}
+			}
+		}
+		]`
+
+		eventsPage3_foo := `[]`
 
 		BeforeEach(func() {
 			token := map[string]string{"token": "itsatoken"}
@@ -397,6 +474,61 @@ var _ = Describe("counting bosh deployments and get deploy date", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(date).To(Equal(time.Unix(1448000000, 0).UTC()))
 		})
+
+		It("find the deploy date of diego/1.6.2", func() {
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+
+			director.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events"),
+					ghttp.RespondWith(statusOK, eventsPage1),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "before_id=2"),
+					ghttp.RespondWith(statusOK, eventsPage2_diego),
+				),
+			)
+
+			date, err := deployCounter.DeployDate("diego", "1.6.2", 3)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(date).To(Equal(time.Unix(1448000000, 0).UTC()))
+		})
+
+		It("raises an error finding the deploy date of foo/124", func() {
+			deployCounter := &deployments.DeployCounter{
+				DirectorURL:     director.URL(),
+				UaaURL:          uaa.URL(),
+				UaaClientID:     "some-client",
+				UaaClientSecret: "itsasecret",
+				CaCert:          validCACert,
+			}
+
+			director.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events"),
+					ghttp.RespondWith(statusOK, eventsPage1),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "before_id=2"),
+					ghttp.RespondWith(statusOK, eventsPage2_foo),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/events", "before_id=1"),
+					ghttp.RespondWith(statusOK, eventsPage3_foo),
+				),
+			)
+
+			_, err := deployCounter.DeployDate("foo", "124", 3)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError("No events found for foo version 124"))
+		})
+
 	})
 
 	Context("error returned from director", func() {

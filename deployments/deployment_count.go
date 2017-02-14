@@ -3,10 +3,12 @@ package deployments
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/blang/semver"
 	boshdir "github.com/cloudfoundry/bosh-cli/director"
 	boshuaa "github.com/cloudfoundry/bosh-cli/uaa"
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
@@ -212,33 +214,51 @@ func IsReleaseUpdate(event boshdir.Event, release string, version string) bool {
 		return false
 	}
 
-	version_int, err := strconv.Atoi(version)
+	var version_before, version_after string
+	var semver_before, semver_after, latest_semver_before semver.Version
+	var err error
+
+	re := regexp.MustCompile(fmt.Sprintf("^%s\\/(.*)", release))
+
+	for _, release_before := range releases_before {
+		matches := re.FindStringSubmatch(release_before.(string))
+		if matches != nil {
+			version_before = matches[1]
+			semver_before, err = semver.Parse(version_before)
+			if err != nil {
+				semver_before, err = semver.Parse(version_before + ".0.0")
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			if latest_semver_before.LT(semver_before) {
+				latest_semver_before = semver_before
+			}
+		}
+	}
+
+	for _, release_after := range releases_after {
+		matches := re.FindStringSubmatch(release_after.(string))
+		if matches != nil && matches[1] == version {
+			version_after = matches[1]
+			break
+		}
+	}
+
+	if version_before == "" || version_after == "" {
+		return false
+	}
+
+	semver_after, err = semver.Parse(version_after)
 	if err != nil {
-		panic(err)
-	}
-
-	version_before := strconv.Itoa(version_int - 1)
-
-	old_release := fmt.Sprintf("%s/%s", release, version_before)
-	new_release := fmt.Sprintf("%s/%s", release, version)
-
-	found_old_release, found_new_release := false, false
-
-	for _, release := range releases_before {
-		if release == old_release {
-			found_old_release = true
-			break
+		semver_after, err = semver.Parse(version_after + ".0.0")
+		if err != nil {
+			panic(err)
 		}
 	}
 
-	for _, release := range releases_after {
-		if release == new_release {
-			found_new_release = true
-			break
-		}
-	}
-
-	return found_old_release && found_new_release
+	return semver_after.GT(latest_semver_before)
 }
 
 func isDeployment(event boshdir.Event) bool {
