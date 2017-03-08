@@ -63,6 +63,7 @@ func main() {
 	caCert := flag.String("caCert", "", "CA Cert")
 	calendarMonth := flag.String("calendarMonth", "", "Calendar month/year YYYY/MM")
 	repaveUser := flag.String("repaveUser", "", "The username to filter out as the 'repave' user")
+	deployment := flag.String("deployment", "", "The deployment to filter out")
 
 	releaseName := flag.String("release", "", "The release to filter for the deploy date")
 	releaseVersion := flag.String("version", "", "The version to filter for the deploy date")
@@ -81,7 +82,7 @@ func main() {
 	if *releaseName == "" {
 		numberByDeployment := make(map[string]int)
 
-		err := deployCounter.SuccessfulDeploys(*calendarMonth, 200, *repaveUser, &numberByDeployment)
+		err := deployCounter.SuccessfulDeploys(*calendarMonth, 200, *repaveUser, &numberByDeployment, *deployment)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)

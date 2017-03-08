@@ -71,7 +71,7 @@ var _ = Describe("counting bosh deployments and get deploy date", func() {
 			}
 
 			runningCount := make(map[string]int)
-			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount)
+			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount, "")
 			Expect(director.ReceivedRequests()).To(HaveLen(1))
 			Expect(uaa.ReceivedRequests()).To(HaveLen(1))
 			Expect(err).NotTo(HaveOccurred())
@@ -208,7 +208,7 @@ var _ = Describe("counting bosh deployments and get deploy date", func() {
 				"bla1": 1,
 				"bla2": 1,
 			}
-			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount)
+			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount, "")
 			Expect(director.ReceivedRequests()).To(HaveLen(1))
 			Expect(uaa.ReceivedRequests()).To(HaveLen(1))
 			Expect(err).NotTo(HaveOccurred())
@@ -414,7 +414,7 @@ var _ = Describe("counting bosh deployments and get deploy date", func() {
 				"bla1": 2,
 				"bla2": 1,
 			}
-			err := deployCounter.SuccessfulDeploys("2015/11", 3, "repave", &runningCount)
+			err := deployCounter.SuccessfulDeploys("2015/11", 3, "repave", &runningCount, "")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(runningCount).To(Equal(expectedRunningcount))
 		})
@@ -444,7 +444,7 @@ var _ = Describe("counting bosh deployments and get deploy date", func() {
 				"bla2": 1,
 			}
 
-			err := deployCounter.SuccessfulDeploys("2015/11", 3, "MyCustomRepaveUserInProd", &runningCount)
+			err := deployCounter.SuccessfulDeploys("2015/11", 3, "MyCustomRepaveUserInProd", &runningCount, "")
 			Expect(director.ReceivedRequests()).To(HaveLen(2))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(runningCount).To(Equal(expectedRunningcount))
@@ -564,7 +564,7 @@ var _ = Describe("counting bosh deployments and get deploy date", func() {
 			runningCount := make(map[string]int)
 			expectedRunningcount := map[string]int{}
 
-			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount)
+			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount, "")
 			Expect(director.ReceivedRequests()).To(HaveLen(1))
 			Expect(err).To(HaveOccurred())
 			Expect(runningCount).To(Equal(expectedRunningcount))
@@ -583,7 +583,7 @@ var _ = Describe("counting bosh deployments and get deploy date", func() {
 			runningCount := make(map[string]int)
 			expectedRunningcount := map[string]int{}
 
-			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount)
+			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount, "")
 			Expect(director.ReceivedRequests()).To(HaveLen(0))
 			Expect(err).To(HaveOccurred())
 			Expect(runningCount).To(Equal(expectedRunningcount))
@@ -603,7 +603,7 @@ var _ = Describe("counting bosh deployments and get deploy date", func() {
 			runningCount := make(map[string]int)
 			expectedRunningcount := map[string]int{}
 
-			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount)
+			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount, "")
 			Expect(director.ReceivedRequests()).To(HaveLen(0))
 			Expect(err).To(HaveOccurred())
 			Expect(runningCount).To(Equal(expectedRunningcount))
@@ -636,7 +636,7 @@ var _ = Describe("counting bosh deployments and get deploy date", func() {
 			runningCount := make(map[string]int)
 			expectedRunningcount := map[string]int{}
 
-			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount)
+			err := deployCounter.SuccessfulDeploys("2015/11", 999, "repave", &runningCount, "")
 			Expect(director.ReceivedRequests()).To(HaveLen(0))
 			Expect(err).To(HaveOccurred())
 			Expect(runningCount).To(Equal(expectedRunningcount))

@@ -23,7 +23,7 @@ type DeployCounter struct {
 	CaCert          string
 }
 
-func (d *DeployCounter) SuccessfulDeploys(calendarMonth string, itemsPerPage int, repaveUser string, runningCount *map[string]int) error {
+func (d *DeployCounter) SuccessfulDeploys(calendarMonth string, itemsPerPage int, repaveUser string, runningCount *map[string]int, deployment string) error {
 	logger := boshlog.NewLogger(boshlog.LevelError)
 
 	directorClient, err := createDirectorClient(d, logger)
@@ -31,7 +31,7 @@ func (d *DeployCounter) SuccessfulDeploys(calendarMonth string, itemsPerPage int
 		return err
 	}
 
-	opts, err := createCalendarOpts(calendarMonth)
+	opts, err := createCalendarOpts(calendarMonth, deployment)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func createUaaClient(d *DeployCounter, logger boshlog.Logger) (boshuaa.UAA, erro
 	return uaaClient, nil
 }
 
-func createCalendarOpts(calendarMonth string) (boshdir.EventsFilter, error) {
+func createCalendarOpts(calendarMonth string, deployment string) (boshdir.EventsFilter, error) {
 	calendarMonthComponents := strings.Split(calendarMonth, "/")
 	year, err := strconv.Atoi(calendarMonthComponents[0])
 	if err != nil {
@@ -175,11 +175,20 @@ func createCalendarOpts(calendarMonth string) (boshdir.EventsFilter, error) {
 	startTime := now.New(time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC))
 	endTime := startTime.EndOfMonth()
 
-	opts := boshdir.EventsFilter{
-		Before: fmt.Sprintf("%d", endTime.Unix()),
-		After:  fmt.Sprintf("%d", startTime.Unix()),
-	}
+	var opts boshdir.EventsFilter
 
+	if deployment == "" {
+		opts = boshdir.EventsFilter{
+			Before: fmt.Sprintf("%d", endTime.Unix()),
+			After:  fmt.Sprintf("%d", startTime.Unix()),
+		}
+	} else {
+		opts = boshdir.EventsFilter{
+			Before:     fmt.Sprintf("%d", endTime.Unix()),
+			After:      fmt.Sprintf("%d", startTime.Unix()),
+			Deployment: deployment,
+		}
+	}
 	return opts, nil
 }
 
